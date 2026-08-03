@@ -25,7 +25,7 @@ annotations, and carries the updated parameters forward to later samples.
 ## Method
 
 <p align="center">
-  <img src="assets/framework.png" width="100%" alt="Overview of the TTRL-AVU framework">
+  <img src="assets/method_overview3_01.png" width="100%" alt="Overview of the TTRL-AVU framework">
 </p>
 
 The framework contains four stages:
