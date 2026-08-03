@@ -52,6 +52,7 @@ The framework contains four stages:
 TTRL-AVU/
 ├── annotations/             # VAU-Bench multiple-choice QA annotations
 ├── assets/                  # Images used by this README
+├── checkpoints/             # The model weights obtained after training
 ├── configs/                 # Distributed and DeepSpeed configurations
 ├── scripts/
 │   ├── training/            # Test-time GRPO launch scripts
