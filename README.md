@@ -1,23 +1,120 @@
-# TTRL-AVU
+# Test-time Reinforcement Learning for Anomalous Video Understanding
 
-This repository contains the code and annotations for TTRL-AVU, a reinforcement-learning-based approach to video anomaly understanding. The current release focuses on multiple-choice video question answering over UCF-Crime, ECVA, and MSAD.
+Official implementation of **Test-time Reinforcement Learning for Anomalous
+Video Understanding**.
+
+Huining Li, Yuxiang Du, Jiyang Tan, Qian Li, MingCai Chen, Jian Zhang,
+Xingdong Sheng, and Yuntao Du
+
+> Paper and arXiv links will be added after the public release.
+
+## Overview
+
+Anomalous video understanding requires a model not only to detect unusual
+events, but also to interpret the objects, actions, interactions, and event
+semantics involved. Although Video-LLMs provide promising zero-shot
+capabilities, a frozen model can struggle with diverse anomaly patterns and
+changing deployment environments.
+
+This work studies **online test-time reinforcement learning (TTRL)** for
+anomalous video understanding. The model adapts directly to an incoming stream
+of unlabeled test videos, without ground-truth answers or additional human
+annotations, and carries the updated parameters forward to later samples.
+
+### Research questions
+
+Directly applying self-consistency-based test-time RL introduces three key
+problems:
+
+1. **Unreliable pseudo-labels.** A majority answer can still be incorrect,
+   especially for temporally sparse or visually ambiguous anomalous events.
+2. **Uninformative binary rewards.** Majority-vote rewards discard generation
+   uncertainty and treat responses with different confidence equally.
+3. **Degenerate group advantages.** When all rollouts select the same answer,
+   identical rewards make group-relative advantages collapse to zero.
+
+## Method
+
+<p align="center">
+  <img src="assets/framework.png" width="100%" alt="Overview of the TTRL-AVU framework">
+</p>
+
+The framework contains four stages:
+
+1. **Dual-query consistency filtering.** The original question is rewritten
+   into a semantically equivalent query while preserving the answer choices.
+   A sample is retained only when both query views produce the same strict
+   majority answer.
+2. **Entropy-aware consensus reward.** Answer agreement is combined with token
+   entropy so that confident, consensus-aligned rollouts provide stronger and
+   more informative optimization signals.
+3. **Virtual negative anchor.** A virtual zero-reward anchor is introduced
+   during advantage normalization for unanimous rollout groups, preventing
+   group-relative advantages from vanishing. It has no completion and does not
+   contribute directly to the token-level policy loss.
+4. **Online GRPO update.** The model is updated on retained unlabeled samples,
+   performs inference, and carries its adapted parameters into the next test
+   round.
+
+## Main Results
+
+Multiple-choice QA accuracy (%) on the three VAU-Bench subsets:
+
+| Dataset | Method | w/o Think | w/ Think |
+| --- | --- | ---: | ---: |
+| MSAD | Qwen2.5-VL-3B | 85.83 | 82.50 |
+| MSAD | VAU-R1 | 88.33 | 87.08 |
+| MSAD | **TTRL-AVU (ours)** | **92.50** | **90.00** |
+| UCF-Crime | Qwen2.5-VL-3B | 91.63 | 83.27 |
+| UCF-Crime | VAU-R1 | 92.03 | 91.63 |
+| UCF-Crime | **TTRL-AVU (ours)** | **92.83** | **92.43** |
+| ECVA | Qwen2.5-VL-3B | 85.58 | 75.81 |
+| ECVA | VAU-R1 | 89.53 | 86.51 |
+| ECVA | **TTRL-AVU (ours)** | **91.46** | **90.00** |
+
+Our method outperforms the frozen Qwen2.5-VL-3B backbone and VAU-R1 in all six
+evaluated QA settings. The largest gain over the frozen backbone is on ECVA
+with thinking, where accuracy improves from 75.81% to 90.00%.
+
+## Repository Structure
+
+```text
+TTRL-AVU/
+├── annotations/             # VAU-Bench multiple-choice QA annotations
+├── assets/                  # Images used by this README
+├── configs/                 # Distributed and DeepSpeed configurations
+├── scripts/
+│   ├── training/            # Test-time GRPO launch scripts
+│   └── evaluation/          # Classification evaluation launcher
+├── src/
+│   ├── evaluation/          # QA and classification evaluators
+│   └── open_r1/             # Training, reward, and model utilities
+├── environment.yml
+└── README.md
+```
 
 ## Environment Setup
 
-The environment has been tested on Linux with Python 3.10, PyTorch 2.6.0, and CUDA-enabled GPUs. A complete Conda specification is provided in `environment.yml`.
+The environment has been tested on Linux with Python 3.10, PyTorch 2.6.0,
+and CUDA-enabled GPUs. A complete Conda specification is provided in
+`environment.yml`.
 
 ```bash
 conda env create -f environment.yml
 conda activate ttrl-avu
 ```
 
-Creating the environment downloads PyTorch and CUDA-related packages and may take some time. Make sure that the installed NVIDIA driver is compatible with the CUDA runtime used by PyTorch. You can verify the installation with:
+Creating the environment downloads PyTorch and CUDA-related packages and may
+take some time. Make sure that the installed NVIDIA driver is compatible with
+the CUDA runtime used by PyTorch. Verify the installation with:
 
 ```bash
 python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
 ```
 
-The default training configuration uses the Qwen2.5-VL checkpoint from Hugging Face. If the checkpoint is gated or downloaded from a private mirror, authenticate with Hugging Face before training.
+The default configuration uses Qwen2.5-VL-3B-Instruct from Hugging Face. If
+the checkpoint is gated or downloaded from a private mirror, authenticate with
+Hugging Face before training.
 
 ## Dataset Preparation
 
@@ -27,9 +124,12 @@ Download the original videos from the official dataset pages:
 - [ECVA](https://github.com/Dulpy/ECVA)
 - [MSAD](https://github.com/Tom-roujiang/MSAD)
 
-The QA annotations used by this repository are provided in `annotations/`. After downloading a dataset, place its videos in a directory of your choice. Video filenames are expected to match the `Video Name` column in the corresponding CSV annotation file.
+The QA annotations used by this repository are provided in `annotations/`.
+After downloading a dataset, place its videos in a directory of your choice.
+Video filenames must match the `Video Name` column in the corresponding CSV
+annotation file.
 
-An example layout is:
+Example layout:
 
 ```text
 TTRL-AVU/
@@ -43,40 +143,33 @@ TTRL-AVU/
     └── msad/
 ```
 
-The video directories are not required to be inside the repository. Set `--train_video_folder` to the actual location when configuring training.
-
-Please follow the licenses and terms of use of the original datasets. This repository does not redistribute the source videos.
+The video directories do not need to be inside the repository. Set
+`--train_video_folder` to the actual location in the training configuration.
+Please follow the licenses and terms of use of the original datasets. This
+repository does not redistribute the source videos.
 
 ## Training
 
-Before running training, edit `scripts/training/run_grpo_video_qa.sh`. At minimum, review and update the following settings:
+Before running training, edit `scripts/training/run_grpo_video_qa.sh`. At
+minimum, review and update:
 
-- `CUDA_VISIBLE_DEVICES`: comma-separated GPU IDs visible to the job.
-- `--nproc_per_node`: number of training processes; normally this must equal the number of visible GPUs.
-- `--model_name_or_path`: Hugging Face model ID or local path to the base model checkpoint.
-- `--train_data_path`: path to the selected CSV annotation file.
-- `--train_video_folder`: directory containing the corresponding videos.
-- `--dataset_name`: short dataset identifier used in result filenames, for example `ucf`, `ecva`, or `msad`.
-- `--use_think_prompt`: set to `true` for `<think>...</think><answer>...</answer>` output or `false` for answer-only output.
-- `--num_generations`: number of responses sampled for each prompt during GRPO.
-- `--generation_batch_size`: total rollout batch size. Keep it compatible with `--num_generations` and the available GPU memory.
-- `--per_device_train_batch_size`, `--gradient_accumulation_steps`, `--max_completion_length`, and the DeepSpeed configuration: adjust these according to available memory and the intended experiment.
-- `--master_port`: change this if the default port is already in use.
+- `CUDA_VISIBLE_DEVICES` and `--nproc_per_node`
+- `--model_name_or_path`
+- `--train_data_path` and `--train_video_folder`
+- `--dataset_name`
+- `--use_think_prompt`
+- `--num_generations` and `--generation_batch_size`
+- batch size, gradient accumulation, completion length, and DeepSpeed settings
+- `--master_port`
 
-The script creates checkpoints in `checkpoints/`, TensorBoard logs in `logs/`, and QA JSONL outputs in `results/qa/`. From the repository root, run:
+From the repository root, run:
 
 ```bash
 sh scripts/training/run_grpo_video_qa.sh
 ```
 
-Equivalently, from the training-script directory:
-
-```bash
-cd scripts/training
-sh run_grpo_video_qa.sh
-```
-
-To inspect training metrics:
+The script writes checkpoints to `checkpoints/`, TensorBoard logs to `logs/`,
+and QA predictions to `results/qa/`. Inspect training metrics with:
 
 ```bash
 tensorboard --logdir logs
@@ -84,41 +177,46 @@ tensorboard --logdir logs
 
 ## Evaluation
 
-Training writes a post-training inference file similar to:
+Training produces a post-adaptation prediction file similar to:
 
 ```text
 results/qa/result_entropy_consensus_anchor_rewrite_<dataset>_<prompt-mode>.jsonl
 ```
 
-Before evaluation, open `src/evaluation/evaluation_qa.py` and set `input_file` to the JSONL file to evaluate. The evaluator extracts an A/B/C/D answer, adds an `evaluation` field to each JSONL record, and writes aggregate accuracy to a neighboring `*_evaluation.txt` file.
-
-Run the evaluator from its directory:
+Set `input_file` in `src/evaluation/evaluation_qa.py` to the JSONL file to
+evaluate, then run:
 
 ```bash
 cd src/evaluation
 python evaluation_qa.py
 ```
 
-Note that the evaluator updates the input JSONL file in place. Keep a copy if the original predictions must remain unchanged.
+The evaluator extracts an A/B/C/D answer, adds an `evaluation` field to each
+record, and writes aggregate accuracy to a neighboring `*_evaluation.txt`
+file. It updates the input JSONL file in place, so keep a copy when the
+original predictions must remain unchanged.
 
 ## Citation
 
-If this repository is useful in your research, please cite the associated paper when its citation information becomes available. This codebase is adapted from [VAU-R1](https://github.com/GVCLab/VAU-R1); please also cite the original work:
+If this repository is useful in your research, please cite:
 
 ```bibtex
-@misc{zhu2025vaur1,
-  title         = {VAU-R1: Advancing Video Anomaly Understanding via Reinforcement Fine-Tuning},
-  author        = {Liyun Zhu and Qixiang Chen and Xi Shen and Xiaodong Cun},
-  year          = {2025},
-  eprint        = {2505.23504},
-  archivePrefix = {arXiv},
-  primaryClass  = {cs.CV},
-  url           = {https://arxiv.org/abs/2505.23504}
+@article{li2026testtime,
+  title   = {Test-time Reinforcement Learning for Anomalous Video Understanding},
+  author  = {Li, Huining and Duan, Yuxiang and Tan, Jiyang and Li, Qian and
+             Chen, MingCai and Zhang, Jian and Sheng, Xingdong and Du, Yuntao},
+  journal = {arXiv preprint},
+  year    = {2026}
 }
 ```
 
-Please also cite UCF-Crime, ECVA, and MSAD when using the corresponding datasets, following the citation instructions on their official pages.
+The arXiv identifier and URL will be added after publication. Please also cite
+UCF-Crime, ECVA, and MSAD when using the corresponding datasets.
 
 ## Acknowledgements
 
-This codebase was developed by modifying [GVCLab/VAU-R1](https://github.com/GVCLab/VAU-R1). We sincerely thank the VAU-R1 authors for releasing their code and annotations. We also thank the creators and maintainers of UCF-Crime, ECVA, MSAD, Qwen2.5-VL, Hugging Face Transformers, TRL, and DeepSpeed.
+This codebase was developed by modifying
+[VAU-R1](https://github.com/GVCLab/VAU-R1). We sincerely thank its authors for
+releasing their code and annotations. We also thank the creators and
+maintainers of UCF-Crime, ECVA, MSAD, Qwen2.5-VL, Hugging Face Transformers,
+TRL, and DeepSpeed.
