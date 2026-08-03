@@ -21,17 +21,6 @@ anomalous video understanding. The model adapts directly to an incoming stream
 of unlabeled test videos, without ground-truth answers or additional human
 annotations, and carries the updated parameters forward to later samples.
 
-### Research questions
-
-Directly applying self-consistency-based test-time RL introduces three key
-problems:
-
-1. **Unreliable pseudo-labels.** A majority answer can still be incorrect,
-   especially for temporally sparse or visually ambiguous anomalous events.
-2. **Uninformative binary rewards.** Majority-vote rewards discard generation
-   uncertainty and treat responses with different confidence equally.
-3. **Degenerate group advantages.** When all rollouts select the same answer,
-   identical rewards make group-relative advantages collapse to zero.
 
 ## Method
 
@@ -56,25 +45,6 @@ The framework contains four stages:
    performs inference, and carries its adapted parameters into the next test
    round.
 
-## Main Results
-
-Multiple-choice QA accuracy (%) on the three VAU-Bench subsets:
-
-| Dataset | Method | w/o Think | w/ Think |
-| --- | --- | ---: | ---: |
-| MSAD | Qwen2.5-VL-3B | 85.83 | 82.50 |
-| MSAD | VAU-R1 | 88.33 | 87.08 |
-| MSAD | **TTRL-AVU (ours)** | **92.50** | **90.00** |
-| UCF-Crime | Qwen2.5-VL-3B | 91.63 | 83.27 |
-| UCF-Crime | VAU-R1 | 92.03 | 91.63 |
-| UCF-Crime | **TTRL-AVU (ours)** | **92.83** | **92.43** |
-| ECVA | Qwen2.5-VL-3B | 85.58 | 75.81 |
-| ECVA | VAU-R1 | 89.53 | 86.51 |
-| ECVA | **TTRL-AVU (ours)** | **91.46** | **90.00** |
-
-Our method outperforms the frozen Qwen2.5-VL-3B backbone and VAU-R1 in all six
-evaluated QA settings. The largest gain over the frozen backbone is on ECVA
-with thinking, where accuracy improves from 75.81% to 90.00%.
 
 ## Repository Structure
 
